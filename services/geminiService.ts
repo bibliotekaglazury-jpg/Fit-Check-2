@@ -4,7 +4,7 @@
 */
 
 // Теперь все запросы идут через Railway бэкенд
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://fit-check-backend-production.up.railway.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://fit-check-backend-production-92b6.up.railway.app';
 
 // Утилита для конвертации файлов в FormData
 const fileToFormData = (file: File, fieldName: string = 'file') => {
