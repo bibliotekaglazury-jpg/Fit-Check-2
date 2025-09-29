@@ -101,8 +101,8 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelFinalized }) => {
           </div>
           <div className="w-full lg:w-1/2 flex flex-col items-center justify-center">
             <Compare
-              firstImage="https://raw.githubusercontent.com/bibliotekaglazury-jpg/Fit-Check/main/before.jpg"
-              secondImage="https://raw.githubusercontent.com/bibliotekaglazury-jpg/Fit-Check/main/after%20222.png"
+              firstImage="https://raw.githubusercontent.com/bibliotekaglazury-jpg/Fit-Check-2/main/before%201.png"
+              secondImage="https://github.com/bibliotekaglazury-jpg/Fit-Check-2/raw/main/video%20after.mov"
               slideMode="drag"
               className="w-full max-w-sm aspect-[2/3] rounded-2xl bg-gray-200"
             />

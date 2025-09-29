@@ -2,10 +2,11 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import React, { useState } from 'react';
-import { RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon, InstagramIcon, XIcon, DownloadIcon } from './icons';
+import React, { useState, useRef, useEffect } from 'react';
+import { RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon, InstagramIcon, XIcon, DownloadIcon, VolumeIcon, VolumeXIcon } from './icons';
 import Spinner from './Spinner';
 import { AnimatePresence, motion } from 'framer-motion';
+import { videoMovementTemplates, type VideoMovementTemplate } from '../config/videoTemplates';
 
 interface CanvasProps {
   displayImageUrl: string | null;
@@ -17,12 +18,17 @@ interface CanvasProps {
   currentPoseIndex: number;
   availablePoseKeys: string[];
   displayVideoUrl: string | null;
-  onGenerateVideo: () => void;
+  onGenerateVideo: (templateId?: string) => void;
   onCloseVideo: () => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading, loadingMessage, onSelectPose, poseInstructions, currentPoseIndex, availablePoseKeys, displayVideoUrl, onGenerateVideo, onCloseVideo }) => {
   const [isPoseMenuOpen, setIsPoseMenuOpen] = useState(false);
+  const [isVideoTemplateMenuOpen, setIsVideoTemplateMenuOpen] = useState(false);
+  const [selectedVideoTemplate, setSelectedVideoTemplate] = useState<string>('runway-walk');
+  const [isMuted, setIsMuted] = useState(true);
+  const [volume, setVolume] = useState(0.5);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   const handlePreviousPose = () => {
     if (isLoading || availablePoseKeys.length <= 1) return;
@@ -70,6 +76,39 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
         const newGlobalPoseIndex = (currentPoseIndex + 1) % poseInstructions.length;
         onSelectPose(newGlobalPoseIndex);
     }
+  };
+  
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+      if (newVolume === 0) {
+        setIsMuted(true);
+        videoRef.current.muted = true;
+      } else if (isMuted) {
+        setIsMuted(false);
+        videoRef.current.muted = false;
+      }
+    }
+  };
+
+  const handleVideoTemplateSelect = (templateId: string) => {
+    setSelectedVideoTemplate(templateId);
+    setIsVideoTemplateMenuOpen(false);
+    // Automatically start video generation with selected template
+    onGenerateVideo(templateId);
+  };
+
+  const handleGenerateVideo = () => {
+    onGenerateVideo(selectedVideoTemplate);
   };
   
   return (
@@ -135,11 +174,13 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
           >
             <div className="relative w-full h-full flex items-center justify-center">
               <video
+                ref={videoRef}
                 key={displayVideoUrl}
                 src={displayVideoUrl}
                 autoPlay
                 loop
-                muted
+                muted={isMuted}
+                volume={volume}
                 playsInline
                 className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               />
@@ -159,6 +200,29 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
                  >
                     <XIcon className="w-5 h-5" />
                  </button>
+              </div>
+              
+              {/* Audio Controls */}
+              <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-white/60 backdrop-blur-md rounded-full px-4 py-2">
+                <button
+                  onClick={toggleMute}
+                  className="flex items-center justify-center text-gray-800 hover:text-gray-600 transition-colors"
+                  aria-label={isMuted ? "Unmute video" : "Mute video"}
+                >
+                  {isMuted ? <VolumeXIcon className="w-5 h-5" /> : <VolumeIcon className="w-5 h-5" />}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  className="w-16 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
+                  style={{
+                    background: `linear-gradient(to right, #4b5563 0%, #4b5563 ${volume * 100}%, #d1d5db ${volume * 100}%, #d1d5db 100%)`
+                  }}
+                />
               </div>
             </div>
           </motion.div>
@@ -230,20 +294,61 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
             </div>
           </div>
 
-          {/* Video Button */}
-          <motion.button
-              onClick={onGenerateVideo}
-              disabled={isLoading}
-              className="flex items-center gap-2 bg-white/60 backdrop-blur-md rounded-full py-3 pl-4 pr-3 border border-gray-300/50 hover:bg-white/80 transition-all disabled:opacity-50"
-              aria-label="Create Reel Video"
-              title="Create Reel Video"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <InstagramIcon className="w-5 h-5 text-gray-800" />
-              <span className="text-sm font-semibold text-gray-800">Create Reel</span>
-              <span className="ml-1 bg-gray-200 text-gray-600 text-xs font-mono px-1.5 py-0.5 rounded-md">9:16</span>
-            </motion.button>
+          {/* Video Button with Template Selection */}
+          <div
+            className="relative"
+            onMouseEnter={() => setIsVideoTemplateMenuOpen(true)}
+            onMouseLeave={() => setIsVideoTemplateMenuOpen(false)}
+          >
+            {/* Video Template Selection Popover */}
+            <AnimatePresence>
+              {isVideoTemplateMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="absolute bottom-full mb-3 w-80 bg-white/90 backdrop-blur-lg rounded-xl p-3 border border-gray-200/80 shadow-lg"
+                  style={{ left: '50%', transform: 'translateX(-50%)' }}
+                >
+                  <div className="grid grid-cols-2 gap-2">
+                    {videoMovementTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => handleVideoTemplateSelect(template.id)}
+                        disabled={isLoading || template.id === selectedVideoTemplate}
+                        className="w-full text-left text-sm p-3 rounded-lg transition-colors hover:bg-gray-100/70 disabled:opacity-100 disabled:bg-gray-900/10 disabled:font-semibold disabled:cursor-default flex flex-col gap-1"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{template.icon}</span>
+                          <span className="font-medium text-gray-800">{template.name}</span>
+                        </div>
+                        <span className="text-xs text-gray-600">{template.description}</span>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                          <span>♪ {template.musicStyle}</span>
+                          <span>• {template.duration}s</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <motion.button
+                onClick={handleGenerateVideo}
+                disabled={isLoading}
+                className="flex items-center gap-2 bg-white/60 backdrop-blur-md rounded-full py-3 pl-4 pr-3 border border-gray-300/50 hover:bg-white/80 transition-all disabled:opacity-50"
+                aria-label="Create Reels Video"
+                title="Create Reels Video"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <InstagramIcon className="w-5 h-5 text-gray-800" />
+                <span className="text-sm font-semibold text-gray-800">Create Reels</span>
+                <span className="ml-1 bg-gray-200 text-gray-600 text-xs font-mono px-1.5 py-0.5 rounded-md">9:16</span>
+              </motion.button>
+          </div>
         </div>
       )}
     </div>

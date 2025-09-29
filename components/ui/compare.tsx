@@ -20,6 +20,7 @@ interface CompareProps {
   showHandlebar?: boolean;
   autoplay?: boolean;
   autoplayDuration?: number;
+  secondImageIsVideo?: boolean;
 }
 export const Compare = ({
   firstImage = "",
@@ -32,11 +33,19 @@ export const Compare = ({
   showHandlebar = true,
   autoplay = false,
   autoplayDuration = 5000,
+  secondImageIsVideo = false,
 }: CompareProps) => {
   const [sliderXPercent, setSliderXPercent] = useState(initialSliderPercentage);
   const [isDragging, setIsDragging] = useState(false);
  
   const sliderRef = useRef<HTMLDivElement>(null);
+  
+  // Auto-detect if secondImage is a video
+  const isSecondImageVideo = secondImageIsVideo || 
+    secondImage.toLowerCase().includes('.mp4') || 
+    secondImage.toLowerCase().includes('.mov') || 
+    secondImage.toLowerCase().includes('.webm') || 
+    secondImage.toLowerCase().includes('.ogg');
  
   const [isMouseOver, setIsMouseOver] = useState(false);
  
@@ -214,9 +223,10 @@ export const Compare = ({
                 alt="first image"
                 src={firstImage}
                 className={cn(
-                  "absolute inset-0  z-20 rounded-2xl shrink-0 w-full h-full select-none object-cover",
+                  "absolute inset-0  z-20 rounded-2xl shrink-0 w-full h-full select-none object-cover object-top",
                   firstImageClassName
                 )}
+                style={{ objectPosition: '50% 35%' }}
                 draggable={false}
               />
             </motion.div>
@@ -226,15 +236,34 @@ export const Compare = ({
  
       <AnimatePresence initial={false}>
         {secondImage ? (
-          <motion.img
-            className={cn(
-              "absolute top-0 left-0 z-[19]  rounded-2xl w-full h-full select-none object-cover",
-              secondImageClassname
-            )}
-            alt="second image"
-            src={secondImage}
-            draggable={false}
-          />
+          isSecondImageVideo ? (
+            <motion.video
+              className={cn(
+                "absolute top-0 left-0 z-[19] rounded-2xl w-full h-full select-none object-cover object-top",
+                secondImageClassname
+              )}
+              style={{ objectPosition: '50% 35%' }}
+              src={secondImage}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              controls={false}
+            />
+          ) : (
+            <motion.img
+              className={cn(
+                "absolute top-0 left-0 z-[19] rounded-2xl w-full h-full select-none object-cover object-top",
+                secondImageClassname
+              )}
+              style={{ objectPosition: '50% 35%' }}
+              alt="second image"
+              src={secondImage}
+              draggable={false}
+            />
+          )
         ) : null}
       </AnimatePresence>
     </div>

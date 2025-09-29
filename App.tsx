@@ -19,7 +19,17 @@ import { getFriendlyErrorMessage } from './lib/utils';
 import Spinner from './components/Spinner';
 import PostCopyPanel from './components/PostCopyPanel';
 import HistoryGallery from './components/HistoryGallery';
+import VideoHistoryGallery from './components/VideoHistoryGallery';
 import InstagramPanel from './components/InstagramPanel';
+import { getTemplateById, videoMovementTemplates } from './config/videoTemplates';
+
+interface VideoHistoryItem {
+  id: string;
+  url: string;
+  templateName: string;
+  templateIcon: string;
+  timestamp: Date;
+}
 
 const POSE_INSTRUCTIONS = [
   "Full frontal view, hands on hips",
@@ -69,7 +79,11 @@ const App: React.FC = () => {
   const [generatedPostCopy, setGeneratedPostCopy] = useState<string | null>(null);
   const [brandName, setBrandName] = useState<string>('');
   const [generationHistory, setGenerationHistory] = useState<string[]>([]);
+  const [videoHistory, setVideoHistory] = useState<VideoHistoryItem[]>([]);
   const [gallerySelectedImageUrl, setGallerySelectedImageUrl] = useState<string | null>(null);
+  const [carouselImages, setCarouselImages] = useState<string[]>([]);
+  const [carouselProgress, setCarouselProgress] = useState<{ current: number; total: number; stage: string } | null>(null);
+  const [isGeneratingCarousel, setIsGeneratingCarousel] = useState(false);
   const loadingMessageIntervalRef = useRef<number | null>(null);
   const isMobile = useMediaQuery('(max-width: 767px)');
 
@@ -143,7 +157,16 @@ const App: React.FC = () => {
     setBackgroundPromptHistory([]);
     setGeneratedPostCopy(null);
     setGenerationHistory([]);
+    setVideoHistory([]);
+    setCarouselImages([]);
+    setCarouselProgress(null);
+    setIsGeneratingCarousel(false);
     setGallerySelectedImageUrl(null);
+    
+    // Clean up video URLs to prevent memory leaks
+    videoHistory.forEach(item => {
+      URL.revokeObjectURL(item.url);
+    });
   };
 
   const handleGarmentSelect = useCallback(async (garmentFile: File, garmentInfo: WardrobeItem) => {
@@ -349,7 +372,7 @@ const App: React.FC = () => {
     setGallerySelectedImageUrl(null);
   }, []);
 
-  const handleGenerateVideo = useCallback(async () => {
+  const handleGenerateVideo = useCallback(async (templateId?: string) => {
     if (isLoading || !baseDisplayImageUrl) return;
 
     if (generatedVideoUrl) {
@@ -370,7 +393,7 @@ const App: React.FC = () => {
     }, 4000);
 
     try {
-        let operation = await startVideoGeneration(baseDisplayImageUrl);
+        let operation = await startVideoGeneration(baseDisplayImageUrl, templateId);
 
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 10000));
@@ -397,6 +420,17 @@ const App: React.FC = () => {
             const videoBlob = await response.blob();
             const videoUrl = URL.createObjectURL(videoBlob);
             setGeneratedVideoUrl(videoUrl);
+            
+            // Add to video history
+            const template = getTemplateById(templateId || 'runway-walk') || videoMovementTemplates[0];
+            const historyItem: VideoHistoryItem = {
+              id: Date.now().toString(),
+              url: videoUrl,
+              templateName: template.name,
+              templateIcon: template.icon,
+              timestamp: new Date()
+            };
+            setVideoHistory(prev => [historyItem, ...prev]);
         } else if (!downloadLink) {
             throw new Error('Video generation finished, but no video was returned. This may be due to content safety filters. Please try a different pose or outfit.');
         } else if (!process.env.API_KEY) {
@@ -446,7 +480,9 @@ const App: React.FC = () => {
     if (isLoading || !baseDisplayImageUrl) return;
 
     setError(null);
-    setLoadingState({ context: 'carousel', message: 'Generating Instagram Carousel...' });
+    setIsGeneratingCarousel(true);
+    setCarouselImages([]);
+    setCarouselProgress({ current: 0, total: 4, stage: 'Generating Instagram Carousel...' });
 
     try {
         const carouselImages: string[] = [];
@@ -454,16 +490,30 @@ const App: React.FC = () => {
 
         // 1. Different Angles
         for (let i = 1; i <= 3; i++) {
-          setLoadingState({ context: 'carousel', message: `Generating angle shot (${i}/${totalNewImages})...` });
+          setCarouselProgress({ 
+            current: i - 1, 
+            total: totalNewImages, 
+            stage: `Generating angle shot (${i}/${totalNewImages})...` 
+          });
+          
           // Ensure we don't pick the same pose.
           const nextPoseIndex = (currentPoseIndex + i) % POSE_INSTRUCTIONS.length;
           const differentAngleInstruction = POSE_INSTRUCTIONS[nextPoseIndex];
           const angleImageUrl = await generatePoseVariation(baseDisplayImageUrl, differentAngleInstruction);
+          
           carouselImages.push(angleImageUrl);
+          
+          // Stream: Add to carousel display immediately
+          setCarouselImages(prev => [...prev, angleImageUrl]);
         }
 
         // 2. Close-up shot
-        setLoadingState({ context: 'carousel', message: `Generating close-up shot (${totalNewImages}/${totalNewImages})...` });
+        setCarouselProgress({ 
+          current: 3, 
+          total: totalNewImages, 
+          stage: `Generating close-up shot (${totalNewImages}/${totalNewImages})...` 
+        });
+        
         const outfitDescription = activeOutfitLayers
             .slice(1)
             .map(layer => layer.garment?.name)
@@ -471,18 +521,29 @@ const App: React.FC = () => {
             .join(', ');
         const closeupImageUrl = await generateCloseupImage(baseDisplayImageUrl, outfitDescription);
         carouselImages.push(closeupImageUrl);
+        
+        // Stream: Add close-up to carousel display immediately
+        setCarouselImages(prev => [...prev, closeupImageUrl]);
 
-
-        // Add new images to history, avoiding duplicates
+        // Add new images to history, avoiding duplicates (original logic)
         setGenerationHistory(prev => {
             const uniqueNewImages = carouselImages.filter(img => !prev.includes(img));
             return [...prev, ...uniqueNewImages];
+        });
+        
+        setCarouselProgress({ 
+          current: 4, 
+          total: totalNewImages, 
+          stage: 'Carousel completed!' 
         });
 
     } catch (err: unknown) {
         setError(getFriendlyErrorMessage(err, 'Failed to generate carousel'));
     } finally {
-        setLoadingState(null);
+        setIsGeneratingCarousel(false);
+        setTimeout(() => {
+          setCarouselProgress(null);
+        }, 2000);
     }
   }, [isLoading, baseDisplayImageUrl, currentPoseIndex, activeOutfitLayers]);
 
@@ -496,6 +557,23 @@ const App: React.FC = () => {
   const handleHistorySelect = (url: string) => {
     setGallerySelectedImageUrl(url);
     setGeneratedVideoUrl(null); // Close video if it's open when selecting from history
+  };
+
+  const handleVideoHistorySelect = (item: VideoHistoryItem) => {
+    setGeneratedVideoUrl(item.url);
+  };
+
+  const handleVideoHistoryRemove = (id: string) => {
+    setVideoHistory(prev => {
+      const itemToRemove = prev.find(item => item.id === id);
+      if (itemToRemove) {
+        URL.revokeObjectURL(itemToRemove.url);
+        if (generatedVideoUrl === itemToRemove.url) {
+          setGeneratedVideoUrl(null);
+        }
+      }
+      return prev.filter(item => item.id !== id);
+    });
   };
 
   const handleDownloadAll = () => {
@@ -568,6 +646,11 @@ const App: React.FC = () => {
                         onDownloadAll={handleDownloadAll}
                         isLoading={isLoading}
                       />
+                      <VideoHistoryGallery
+                        history={videoHistory}
+                        onSelect={handleVideoHistorySelect}
+                        isLoading={isLoading}
+                      />
                     </div>
                   </div>
 
@@ -618,6 +701,9 @@ const App: React.FC = () => {
                         <InstagramPanel
                           onGenerateCarousel={handleGenerateCarousel}
                           isLoading={isLoading && loadingContext === 'carousel'}
+                          carouselImages={carouselImages}
+                          carouselProgress={carouselProgress}
+                          isGeneratingCarousel={isGeneratingCarousel}
                         />
                         <PostCopyPanel
                           onGeneratePostCopy={handleGeneratePostCopy}

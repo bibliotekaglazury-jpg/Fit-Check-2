@@ -57,7 +57,7 @@ const handleApiResponse = (response: GenerateContentResponse): string => {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 const model = 'gemini-2.5-flash-image-preview';
-const videoModel = 'veo-2.0-generate-001';
+const videoModel = 'veo-3.0-generate-001'; // Working VEO model
 
 export const generateModelImage = async (userImage: File): Promise<string> => {
     const userImagePart = await fileToPart(userImage);
@@ -161,14 +161,14 @@ export const replaceBackgroundWithImage = async (modelImageUrl: string, backgrou
 
 export const generatePoseVariation = async (tryOnImageUrl: string, poseInstruction: string): Promise<string> => {
     const tryOnImagePart = dataUrlToPart(tryOnImageUrl);
-    const prompt = `You are an expert fashion photographer AI. Your task is to regenerate the provided image from a new perspective, while following these strict rules.
+    const prompt = `Create a professional fashion photography variation of the provided image with a different camera angle.
 
-**ABSOLUTE CRITICAL RULE #1: MAINTAIN DIMENSIONS. The output image MUST have the exact same pixel dimensions (width and height) and aspect ratio as the source image. This is the most important instruction and is non-negotiable.**
-
-**Crucial Rules:**
-1.  **PRESERVE IDENTITY:** The person's face, identity, clothing, and the background style MUST remain identical to the source image. Do not alter their appearance in any way.
-2.  **CHANGE POSE:** The new camera perspective and model's pose must be: "${poseInstruction}".
-3.  **OUTPUT:** Return ONLY the final image. Do not include any text.`;
+**Technical Requirements:**
+- Maintain exact same dimensions and aspect ratio
+- Preserve the person's appearance, clothing, and background
+- Apply new camera perspective: "${poseInstruction}"
+- Professional fashion photography quality
+- Return only the final image`;
     const response = await ai.models.generateContent({
         model,
         contents: { parts: [{ text: prompt }, tryOnImagePart] },
@@ -182,17 +182,17 @@ export const generatePoseVariation = async (tryOnImageUrl: string, poseInstructi
 export const generateCloseupImage = async (imageUrl: string, outfitDescription: string): Promise<string> => {
     const imagePart = dataUrlToPart(imageUrl);
     
-    const clothingFocus = outfitDescription ? `Focus on the details of the clothing: ${outfitDescription}.` : 'Focus on the details of the main garment.';
+    const clothingFocus = outfitDescription ? `Highlight clothing details: ${outfitDescription}` : 'Highlight garment details';
 
-    const prompt = `You are an expert fashion photographer AI. Your task is to create a detailed close-up shot from the provided source image.
+    const prompt = `Create a professional close-up fashion photograph from the provided image.
 
-**ABSOLUTE CRITICAL RULE #1: MAINTAIN DIMENSIONS. The output image MUST have the exact same pixel dimensions (width and height) and aspect ratio as the source image. This is a non-negotiable rule.**
-
-**Crucial Rules:**
-1.  **CREATE CLOSE-UP:** The output must be a close-up (e.g., from the waist up or a detail shot) of the person in the image.
-2.  **FOCUS ON DETAILS:** ${clothingFocus} The shot should highlight the fabric's texture, seams, and craftsmanship.
-3.  **PRESERVE EVERYTHING ELSE:** The person's face, identity, pose, the lighting, and the background style MUST remain perfectly consistent with the source image, just viewed from a closer angle.
-4.  **OUTPUT:** Return ONLY the final image. Do not include any text.`;
+**Requirements:**
+- Same dimensions and aspect ratio as source
+- Close-up view (waist up or detail shot)
+- ${clothingFocus}
+- Showcase fabric texture and craftsmanship
+- Professional fashion photography quality
+- Return only the final image`;
 
     const response = await ai.models.generateContent({
         model, // 'gemini-2.5-flash-image-preview'
@@ -205,29 +205,31 @@ export const generateCloseupImage = async (imageUrl: string, outfitDescription: 
 };
 
 
-export const startVideoGeneration = async (modelImageUrl: string) => {
+export const startVideoGeneration = async (modelImageUrl: string, templateId?: string) => {
     const { data: imageBytes, mimeType } = dataUrlToParts(modelImageUrl);
     
-    const prompt = `You are a video effects AI. Your task is to turn this static image into a short, engaging video clip suitable for a social media reel.
-
-**ULTIMATE COMMAND: The video MUST be in a 9:16 vertical aspect ratio.**
-
-**PRIMARY DIRECTIVE: Create a gentle, slow, and smooth zoom-in effect on the person in the image. The zoom should be subtle and last for 3-4 seconds.**
-
-**CRUCIAL RULE: Do NOT alter the person, their pose, their clothing, or the background in any way other than applying the zoom effect. The person must not be animated.**
-
-**DURATION & LOOP:** The video should be 3-4 seconds long and loop perfectly and seamlessly.
+    // Import video templates
+    const { getTemplateById, getDefaultTemplate } = await import('../config/videoTemplates');
+    const template = templateId ? getTemplateById(templateId) || getDefaultTemplate() : getDefaultTemplate();
     
-**OUTPUT:** Return only the final video file.`;
+    const prompt = template.prompt;
     
+    // Use the working VEO-3.0-generate-001 model directly
     const operation = await ai.models.generateVideos({
         model: videoModel,
         prompt,
         image: { imageBytes, mimeType },
         config: { 
             numberOfVideos: 1,
+            videoLength: template.duration, // Duration based on template
+            aspectRatio: '9:16', // Vertical Instagram format
+            motionStrength: template.motionStrength, // Motion strength from template
+            quality: 'premium', // Best quality for sales
+            cropMode: 'smart', // Intelligent cropping to fill frame
+            scaleMode: 'fill' // Scale to fill entire frame
         }
     });
+    
     return operation;
 };
 
