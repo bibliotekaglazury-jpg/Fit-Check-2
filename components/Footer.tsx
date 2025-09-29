@@ -30,10 +30,10 @@ const Footer: React.FC<FooterProps> = ({ isOnDressingScreen = false }) => {
   }, []);
 
   return (
-    <footer className={`fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-200/60 p-3 z-50 ${isOnDressingScreen ? 'hidden sm:block' : ''}`}>
+    <footer className={`fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-200/60 p-4 pb-6 mb-2 z-50 ${isOnDressingScreen ? 'hidden sm:block' : ''}`}>
       <div className="mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-gray-600 max-w-7xl px-4">
         <p className="font-semibold text-gray-800">
-          Created by @Fit AI Check 2025
+          Created by @Dress Me 2025
         </p>
         <div className="h-4 mt-1 sm:mt-0 flex items-center overflow-hidden">
             <AnimatePresence mode="wait">
