@@ -132,14 +132,14 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
                 key={displayImageUrl}
                 src={displayImageUrl}
                 alt="Virtual try-on model"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                className="w-auto h-full max-w-none object-contain rounded-lg shadow-lg"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.5, ease: 'easeInOut' }}
             />
             ) : (
-                <div className="w-[400px] h-[600px] bg-gray-100 border border-gray-200 rounded-lg flex flex-col items-center justify-center">
+                <div className="w-[500px] h-[700px] bg-gray-100 border border-gray-200 rounded-lg flex flex-col items-center justify-center">
                 <Spinner />
                 <p className="text-md font-serif text-gray-600 mt-4">Loading Model...</p>
                 </div>
@@ -182,7 +182,7 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
                 muted={isMuted}
                 volume={volume}
                 playsInline
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                className="w-auto h-full max-w-none object-contain rounded-lg shadow-2xl"
               />
               <div className="absolute top-4 right-4 flex flex-col gap-2">
                  <a
